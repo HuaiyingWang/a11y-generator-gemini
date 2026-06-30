@@ -663,6 +663,22 @@
             return `<article class="a11y-container">\n${outputStr.trim()}\n</article>`;
         };
 
+        // 送給 AI 前先縮圖至 max 800px，大幅降低 Token 消耗、避免 429
+        const resizeImageForAI = (base64Data, mimeType, maxDim = 800) => new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                const scale = Math.min(maxDim / img.width, maxDim / img.height, 1);
+                const canvas = document.createElement('canvas');
+                canvas.width  = Math.round(img.width  * scale);
+                canvas.height = Math.round(img.height * scale);
+                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                const b64 = canvas.toDataURL('image/jpeg', 0.8).replace(/^data:image\/jpeg;base64,/, '');
+                resolve({ b64, mimeType: 'image/jpeg' });
+            };
+            img.onerror = () => resolve({ b64: base64Data, mimeType }); // fallback 原圖
+            img.src = `data:${mimeType};base64,${base64Data}`;
+        });
+
         // --- 強化的 AI 語意識別引擎 ---
         const analyzeImageWithGemini = async (base64Data, mimeType, contextText = "") => {
             // 透過 Cloudflare Worker proxy 呼叫，API Key 藏在 Worker 環境變數，不出現在前端
@@ -833,7 +849,8 @@ ${contextText ? '圖片所在文章的部分內容：' + contextText : ''}
                         for (const [key, dataUri] of wordImgEntries) {
                             const m = dataUri.match(/^data:([^;]+);base64,(.+)$/);
                             if (!m) continue;
-                            const aiResult = await analyzeImageWithGemini(m[2], m[1], contextText);
+                            const { b64, mimeType: mt } = await resizeImageForAI(m[2], m[1]);
+                            const aiResult = await analyzeImageWithGemini(b64, mt, contextText);
                             const aiAlt = (aiResult?.alt || '').replace(/"/g, '&quot;');
                             if (aiAlt) {
                                 // 替換該 img 的 alt（無論原本是空或 placeholder 提示文字）
@@ -854,7 +871,8 @@ ${contextText ? '圖片所在文章的部分內容：' + contextText : ''}
                         const imgCodes = [];
                         for (let i = 0; i < images.length; i++) {
                             const imgData = images[i];
-                            const aiResult = await analyzeImageWithGemini(imgData.base64, imgData.mimeType, contextText);
+                            const { b64: rB64, mimeType: rMt } = await resizeImageForAI(imgData.base64, imgData.mimeType);
+                            const aiResult = await analyzeImageWithGemini(rB64, rMt, contextText);
                             const altText = aiResult?.alt || `[需人工確認圖片意涵] ${imgData.file.name}`;
                             imgCodes.push(
                                 `<div class="text-center">\n` +
