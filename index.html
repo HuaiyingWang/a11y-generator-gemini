@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,18 +15,48 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Inter', system-ui, sans-serif; background-color: #f1f5f9; margin: 0; overflow: hidden; }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
-        .mobile-screen-scrollbar::-webkit-scrollbar { width: 4px; }
-        .mobile-screen-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .mobile-screen-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
-        
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: #f1f5f9;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 20px;
+        }
+
+        .mobile-screen-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .mobile-screen-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .mobile-screen-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 20px;
+        }
+
         /* 針對預覽區的視覺調整，不影響輸出的原始碼 */
-        .preview-area .a11y-container { padding: 20px; }
+        .preview-area .a11y-container {
+            padding: 20px;
+        }
     </style>
 </head>
+
 <body>
     <div id="root"></div>
 
@@ -164,7 +195,7 @@
             const semanticReplacements = { 'b': 'strong', 'i': 'em', 'strike': 'del', 's': 'del' };
             Array.from(body.querySelectorAll(Object.keys(semanticReplacements).join(','))).forEach(el => {
                 const newTag = doc.createElement(semanticReplacements[el.tagName.toLowerCase()]);
-                while(el.firstChild) newTag.appendChild(el.firstChild);
+                while (el.firstChild) newTag.appendChild(el.firstChild);
                 el.parentNode.replaceChild(newTag, el);
             });
 
@@ -182,12 +213,12 @@
             // 4. 終極解壓縮 (Recursive Unwrapping)
             // 拔掉所有無語意的 span, font, center, u，以及只用來包裝單一元素的冗餘 div
             let hasUnwrapped = true;
-            while(hasUnwrapped) {
+            while (hasUnwrapped) {
                 hasUnwrapped = false;
                 Array.from(body.querySelectorAll('span, font, center, u, div')).forEach(el => {
                     const isLegacyTag = ['SPAN', 'FONT', 'CENTER', 'U'].includes(el.tagName);
                     const isRedundantDiv = el.tagName === 'DIV' && el.children.length === 1 && el.textContent.trim() === el.children[0].textContent.trim() && !el.className;
-                    
+
                     if (isLegacyTag || isRedundantDiv) {
                         const parent = el.parentNode;
                         if (parent) {
@@ -205,7 +236,7 @@
                 const minOriginalLevel = Math.min(...headings.map(h => parseInt(h.tagName.substring(1), 10)));
                 const offset = 3 - minOriginalLevel;
                 let lastNewLevel = 2;
-                
+
                 headings.forEach(h => {
                     const originalLevel = parseInt(h.tagName.substring(1), 10);
                     let targetLevel = originalLevel + offset;
@@ -231,19 +262,19 @@
                         cells.forEach(cell => {
                             const flexItem = doc.createElement('div');
                             flexItem.className = 'flex-item';
-                            while(cell.firstChild) flexItem.appendChild(cell.firstChild);
+                            while (cell.firstChild) flexItem.appendChild(cell.firstChild);
                             flexContainer.appendChild(flexItem);
                         });
                         table.parentNode.replaceChild(flexContainer, table);
                         return; // 跳過後續一般表格無障礙處理
                     }
                 }
-                
+
                 // 一般表格無障礙處理
                 if (!table.querySelector('caption')) {
                     const caption = doc.createElement('caption');
                     caption.textContent = '資料表格';
-                    caption.style.cssText = 'position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important;'; 
+                    caption.style.cssText = 'position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important;';
                     table.insertBefore(caption, table.firstChild);
                 }
                 const firstRow = table.querySelector('tr');
@@ -263,24 +294,24 @@
             // 7. 圖片圖說智慧綁定 (加入 .text-center 與 .text-muted)
             Array.from(body.querySelectorAll('img')).forEach(img => {
                 if (!img.hasAttribute('alt')) img.setAttribute('alt', '');
-                
+
                 // 尋找緊接在後的說明段落
                 let next = img.nextElementSibling;
                 // 如果 img 在 p 裡面，找 p 的下一個兄弟
-                if(img.parentNode.tagName === 'P') {
+                if (img.parentNode.tagName === 'P') {
                     next = img.parentNode.nextElementSibling;
                 }
 
                 if (next && (next.tagName === 'P' || next.tagName === 'SPAN') && next.textContent.trim().length > 0 && next.textContent.trim().length < 60) {
                     const wrapper = doc.createElement('div');
                     wrapper.className = 'text-center';
-                    
+
                     const actualImgNode = img.parentNode.tagName === 'P' && img.parentNode.childNodes.length === 1 ? img.parentNode : img;
-                    
+
                     actualImgNode.parentNode.insertBefore(wrapper, actualImgNode);
                     wrapper.appendChild(img); // 把圖抽出來
-                    if(actualImgNode !== img) actualImgNode.remove(); // 清掉空 P
-                    
+                    if (actualImgNode !== img) actualImgNode.remove(); // 清掉空 P
+
                     const captionP = doc.createElement('p');
                     captionP.className = 'text-muted';
                     captionP.innerHTML = next.innerHTML;
@@ -303,7 +334,7 @@
                 a.classList.add('a11y-link');
                 const href = a.getAttribute('href') || '#';
                 const text = a.textContent.trim() || '連結';
-                
+
                 if (href.startsWith('mailto:') || href.startsWith('tel:')) {
                     a.removeAttribute('target');
                     a.removeAttribute('rel');
@@ -338,10 +369,10 @@
 
             // 10. HTML 美化與縮排
             let outputStr = body.innerHTML;
-            outputStr = outputStr.replace(/[\r\n]{3,}/g, '\n\n'); 
+            outputStr = outputStr.replace(/[\r\n]{3,}/g, '\n\n');
             const blockTags = 'p|div|ul|ol|li|h3|h4|h5|h6|table|thead|tbody|tr|article|blockquote|figure|figcaption';
             const gapRegex = new RegExp(`(</(?:${blockTags})>)\\s*(<(?:${blockTags})(?:\\s[^>]*)?>)`, 'gi');
-            
+
             outputStr = outputStr.replace(gapRegex, '$1\n\n$2');
             outputStr = outputStr.replace(gapRegex, '$1\n\n$2');
             outputStr = outputStr.replace(/(<(?:ul|ol)[^>]*>)\s*/gi, '$1\n    ');
@@ -354,13 +385,14 @@
 
         // --- 強化的 AI 語意識別引擎 ---
         const analyzeImageWithGemini = async (base64Data, mimeType, contextText = "") => {
-            const apiKey = ""; 
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            // 透過 Cloudflare Worker proxy 呼叫，API Key 藏在 Worker 環境變數，不出現在前端
+            const url = 'https://a11y-gemini-proxy.love520297.workers.dev/';
             const payload = {
                 contents: [{
                     role: "user",
                     parts: [
-                        { text: `
+                        {
+                            text: `
                             請擔任一位專業的網頁無障礙架構師。
                             目標：為這張圖片產出 Alt 文字與圖說。
                             上下文參考：${contextText ? '本圖片在文章中的位置附近文字為：' + contextText : '無額外上下文。'}
@@ -402,13 +434,13 @@
             const [sourceInput, setSourceInput] = useState('');
             const [outputHtml, setOutputHtml] = useState('');
             const [imageCodes, setImageCodes] = useState('');
-            const [images, setImages] = useState([]); 
-            const [activeTab, setActiveTab] = useState('desktop-preview'); 
+            const [images, setImages] = useState([]);
+            const [activeTab, setActiveTab] = useState('desktop-preview');
             const [report, setReport] = useState([]);
             const [isProcessing, setIsProcessing] = useState(false);
-            const [isResetting, setIsResetting] = useState(false); 
+            const [isResetting, setIsResetting] = useState(false);
             const [isDragging, setIsDragging] = useState(false);
-            
+
             const imageInputRef = useRef(null);
             const wordInputRef = useRef(null);
 
@@ -421,7 +453,7 @@
                 setReport([]);
                 setIsProcessing(false);
                 setActiveTab('desktop-preview');
-                
+
                 if (imageInputRef.current) imageInputRef.current.value = '';
                 if (wordInputRef.current) wordInputRef.current.value = '';
 
@@ -458,11 +490,11 @@
                 if (!file) return;
                 setIsProcessing(true);
                 const reader = new FileReader();
-                reader.onload = function(loadEvent) {
+                reader.onload = function (loadEvent) {
                     const options = {
                         styleMap: ["p[style-name='Heading 1'] => h1:fresh", "p[style-name='Heading 2'] => h2:fresh", "p[style-name='Heading 3'] => h3:fresh", "p[style-name='Heading 4'] => h4:fresh"]
                     };
-                    mammoth.convertToHtml({arrayBuffer: loadEvent.target.result}, options)
+                    mammoth.convertToHtml({ arrayBuffer: loadEvent.target.result }, options)
                         .then(result => {
                             setInput(result.value.replace(/<img[^>]*>/g, ''));
                             setIsProcessing(false);
@@ -484,7 +516,7 @@
 
                     if (hasInput) combinedHtml += transformToCleanHTML(input) + '\n\n';
                     if (hasSource) combinedHtml += transformToCleanHTML(sourceInput) + '\n\n';
-                    
+
                     let imgCodesStr = '';
                     const contextText = (input + ' ' + sourceInput).replace(/<[^>]*>?/gm, '').substring(0, 800);
 
@@ -518,9 +550,9 @@
                         `✔️ [智慧排版辨識] 成功將舊版並列表格轉為 <div class="flex-container">，圖片與圖說配發 <div class="text-center">。`,
                         `✔️ [A11y 標題與連結防護] 標題層級由 h3 起始排列；為所有 <a> 補上 target="_blank" 與 (另開新視窗) 語意。`
                     ];
-                    
+
                     if (images.length > 0) logs.unshift(`✨ [AI 視覺感知] 圖片分析已依據內文語意生成精準 Alt，不含廢話填充！`);
-                    
+
                     setReport(logs);
                     setActiveTab('output');
                 } catch (error) {
@@ -572,7 +604,7 @@
 
                     {/* Main Workspace */}
                     <div className="flex-1 flex overflow-hidden p-6 gap-6 w-full max-w-[1600px] mx-auto">
-                        
+
                         {/* 左半部：四大輸入區 */}
                         <div className="w-1/2 flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2 pb-10">
                             <div className="bg-blue-50/70 p-4 rounded-xl border border-blue-100 flex items-center justify-between shrink-0">
@@ -607,7 +639,7 @@
                                 <label className="text-sm font-bold text-slate-700 mb-2">3. 一般文章架構 (或 Word 匯入)：</label>
                                 <textarea className="w-full flex-1 p-4 border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white rounded-xl text-base transition-all resize-none shadow-sm custom-scrollbar" onChange={(e) => setInput(e.target.value)} placeholder="在此輸入或貼上您的文章草稿..." value={input}></textarea>
                             </div>
-                            
+
                             <div className="flex flex-col flex-1 min-h-[220px] shrink-0">
                                 <label className="text-sm font-bold text-slate-700 mb-2 flex items-center">
                                     <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md mr-2 text-xs">極致純淨化</span>
@@ -656,7 +688,7 @@
                                                 </ul>
                                             </div>
                                         )}
-                                        
+
                                         {!outputHtml && (
                                             <div className="flex items-center justify-center h-full text-slate-400 font-medium">尚無編譯結果，請先於左側操作並點擊執行。</div>
                                         )}
@@ -682,7 +714,7 @@
                                                 {previewContent ? (
                                                     <div dangerouslySetInnerHTML={{ __html: previewContent }}></div>
                                                 ) : (
-                                                    <div className="flex items-center justify-center h-full text-slate-400 font-medium text-sm text-center p-4">尚無預覽內容<br/>請先執行優化重整。</div>
+                                                    <div className="flex items-center justify-center h-full text-slate-400 font-medium text-sm text-center p-4">尚無預覽內容<br />請先執行優化重整。</div>
                                                 )}
                                             </div>
                                             <div className="h-10 w-full bg-white flex justify-center items-center shrink-0 relative z-20"><div className="w-1/3 h-1.5 bg-slate-800 rounded-full opacity-80"></div></div>
@@ -700,4 +732,5 @@
         root.render(<App />);
     </script>
 </body>
+
 </html>
