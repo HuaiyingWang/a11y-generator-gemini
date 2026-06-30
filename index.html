@@ -350,6 +350,40 @@
                 });
             }
 
+            // 4.5 智慧標題偵測：移除編輯者附注，並將符合特徵的 <p> 升格為 <h2>
+            // 後續步驟 5 會統一將最小層級調整為 h3 起始
+
+            // 移除純編輯者附注（如「(放在網站最上方)」）
+            Array.from(body.querySelectorAll('p')).forEach(p => {
+                const text = p.textContent.trim();
+                if (text.length < 50 && /^[（(]/.test(text) && /[）)]$/.test(text)) p.remove();
+            });
+
+            // 偵測並升格標題型段落
+            Array.from(body.querySelectorAll('p')).forEach(p => {
+                const text = p.textContent.trim();
+                if (!text) return;
+                const firstCode = text.codePointAt(0);
+                const hasHeadingPattern = (
+                    /^【.{1,30}】/.test(text) ||                       // 【標題】格式
+                    /^[▲★◆■▶►▸]\s*/.test(text) ||                   // 特殊符號前綴
+                    /^\d{2,3}年$/.test(text) ||                        // 年度標籤（112年、113年）
+                    (firstCode >= 0x1F300 && firstCode <= 0x1FFFF) ||  // Emoji 前綴（📌📢📞）
+                    (firstCode >= 0x2600 && firstCode <= 0x27BF)       // 其他符號（⚠️✅）
+                );
+                const isShortBeforeList = (
+                    text.length <= 20 &&
+                    !text.includes('：') && !text.includes(':') &&     // 排除「項目：內容」格式
+                    p.nextElementSibling &&
+                    ['UL', 'OL'].includes(p.nextElementSibling.tagName)
+                );
+                if (hasHeadingPattern || isShortBeforeList) {
+                    const h = doc.createElement('h2');
+                    while (p.firstChild) h.appendChild(p.firstChild);
+                    p.parentNode.replaceChild(h, p);
+                }
+            });
+
             // 5. 標題智慧對齊 (確保由 H3 開始)
             const headings = Array.from(body.querySelectorAll('h1, h2, h3, h4, h5, h6'));
             if (headings.length > 0) {
