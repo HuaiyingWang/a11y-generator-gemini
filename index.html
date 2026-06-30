@@ -714,6 +714,7 @@
             const [isProcessing, setIsProcessing] = useState(false);
             const [isResetting, setIsResetting] = useState(false);
             const [isDragging, setIsDragging] = useState(false);
+            const [wordImageMap, setWordImageMap] = useState({});
 
             const imageInputRef = useRef(null);
             const wordInputRef = useRef(null);
@@ -730,6 +731,7 @@
 
                 if (imageInputRef.current) imageInputRef.current.value = '';
                 if (wordInputRef.current) wordInputRef.current.value = '';
+                setWordImageMap({});
 
                 setIsResetting(true);
                 setTimeout(() => setIsResetting(false), 1500);
@@ -765,12 +767,28 @@
                 setIsProcessing(true);
                 const reader = new FileReader();
                 reader.onload = function (loadEvent) {
+                    const imageMap = {};
+                    let imgIdx = 0;
                     const options = {
-                        styleMap: ["p[style-name='Heading 1'] => h1:fresh", "p[style-name='Heading 2'] => h2:fresh", "p[style-name='Heading 3'] => h3:fresh", "p[style-name='Heading 4'] => h4:fresh"]
+                        styleMap: [
+                            "p[style-name='Heading 1'] => h1:fresh",
+                            "p[style-name='Heading 2'] => h2:fresh",
+                            "p[style-name='Heading 3'] => h3:fresh",
+                            "p[style-name='Heading 4'] => h4:fresh"
+                        ],
+                        // 用 placeholder key 取代 base64 src，避免 DOM 爆炸；最後輸出再還原
+                        convertImage: mammoth.images.imgElement(function(image) {
+                            return image.read("base64").then(function(b64) {
+                                const key = `__wimg${++imgIdx}__`;
+                                imageMap[key] = `data:${image.contentType};base64,${b64}`;
+                                return { src: key, alt: '' };
+                            });
+                        })
                     };
                     mammoth.convertToHtml({ arrayBuffer: loadEvent.target.result }, options)
                         .then(result => {
-                            setInput(result.value.replace(/<img[^>]*>/g, ''));
+                            setInput(result.value);
+                            setWordImageMap(imageMap);
                             setIsProcessing(false);
                         }).catch(err => {
                             setIsProcessing(false);
@@ -810,9 +828,17 @@
                         imgCodesStr = imgCodes.join('\n\n');
                     }
 
+                    // Word 內嵌圖片：把處理完的 placeholder 還原為真實 data URI
+                    const restoreWordImages = (html) =>
+                        Object.entries(wordImageMap).reduce(
+                            (str, [key, dataUri]) => str.replaceAll(key, dataUri),
+                            html
+                        );
+
                     if (hasInput || hasSource) {
                         // 依實際 HTML 內容動態產出對應 CSS
-                        setOutputHtml(`${getCleanCSS(combinedHtml)}\n\n${combinedHtml.trim()}`);
+                        const rawOut = `${getCleanCSS(combinedHtml)}\n\n${combinedHtml.trim()}`;
+                        setOutputHtml(restoreWordImages(rawOut));
                         setImageCodes(imgCodesStr);
                     } else {
                         // 純圖片模式：依圖片區塊內容動態產出 CSS
