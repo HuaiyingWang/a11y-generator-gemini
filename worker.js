@@ -31,7 +31,7 @@ export default {
     try {
       const body = await request.json();
 
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${env.GEMINI_API_KEY}`;
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`;
 
       const geminiRes = await fetch(geminiUrl, {
         method: 'POST',

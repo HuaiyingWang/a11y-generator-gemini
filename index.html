@@ -672,15 +672,15 @@
                     role: "user",
                     parts: [
                         {
-                            text: `
-                            請擔任一位專業的網頁無障礙架構師。
-                            目標：為這張圖片產出 Alt 文字與圖說。
-                            上下文參考：${contextText ? '本圖片在文章中的位置附近文字為：' + contextText : '無額外上下文。'}
-                            規則：
-                            1. 嚴禁使用「圖片內容說明」、「如圖所示」等廢話。若無法判斷，Alt 請設為 "[需人工確認圖片意涵]"。
-                            2. 必須從圖片中解析具體資訊 (如圖表數據、海報活動日期、人物主體)。
-                            3. Alt 文字應精簡 (10-30字)，figcaption 可詳盡。
-                        ` },
+                            text: `你是一位網頁無障礙專家，請為這張圖片撰寫 Alt 文字與圖說（繁體中文）。
+${contextText ? '圖片所在文章的部分內容：' + contextText : ''}
+
+輸出規則：
+1. alt：直接描述圖片中可見的主體（物件、場景、人物、顏色、文字等），10-30字，不用「圖片」「如圖」開頭。
+2. 若圖片含有文字（海報、通知單、圖表標題），必須提取關鍵文字納入 alt。
+3. caption：補充說明圖片與文章主題的關聯，可較詳盡。
+4. 只有在圖片完全空白或無法解碼時，alt 才設為 "[需人工確認圖片意涵]"。
+5. 裝飾性圖片（花草、背景）仍須描述其視覺內容，例如：「粉紫色野花盛開的草原，陽光照耀」。` },
                         { inlineData: { mimeType: mimeType, data: base64Data } }
                     ]
                 }],
@@ -702,10 +702,16 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
+                if (!response.ok) {
+                    const errBody = await response.text();
+                    console.error('[Gemini API] HTTP', response.status, errBody);
+                    return { alt: "[AI分析失敗，請手動填寫]", caption: "圖片分析服務暫時無法使用，請手動補充說明。" };
+                }
                 const data = await response.json();
                 return JSON.parse(data.candidates[0].content.parts[0].text);
             } catch (error) {
-                return { alt: "[需人工確認圖片意涵]", caption: "請手動補充說明。" };
+                console.error('[Gemini API] 呼叫失敗：', error);
+                return { alt: "[AI分析失敗，請手動填寫]", caption: "圖片分析服務暫時無法使用，請手動補充說明。" };
             }
         };
 
