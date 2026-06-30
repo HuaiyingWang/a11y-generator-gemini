@@ -439,26 +439,44 @@
                 }
             });
 
-            // 7. 表格轉換為 Flex 佈局 (智慧辨識舊版排版表格)
+            // 7. 表格智慧辨識：版型表格提升為語意內容，資料表格補無障礙標記
             Array.from(body.querySelectorAll('table')).forEach(table => {
-                const rows = table.querySelectorAll('tr');
-                if (rows.length === 1) {
-                    const cells = rows[0].querySelectorAll('td');
-                    if (cells.length > 1) {
-                        // 過濾空白儲存格（含僅有空白 p 的圖片佔位欄），避免產生空白區塊
-                        const nonEmptyCells = Array.from(cells).filter(cell => cell.textContent.trim() !== '');
+                const rows = Array.from(table.querySelectorAll('tr'));
+                if (rows.length === 0) { table.remove(); return; }
 
-                        if (nonEmptyCells.length === 0) {
-                            // 全空 → 直接移除
-                            table.remove();
-                        } else if (nonEmptyCells.length === 1) {
-                            // 只有一欄有內容（另一欄為圖片佔位）→ 直接提升內容，不加 flex 包裝
-                            const frag = doc.createDocumentFragment();
-                            while (nonEmptyCells[0].firstChild) frag.appendChild(nonEmptyCells[0].firstChild);
-                            table.parentNode.insertBefore(frag, table);
-                            table.remove();
+                const allCells = Array.from(table.querySelectorAll('td'));
+                const emptyCells = allCells.filter(cell => cell.textContent.trim() === '').length;
+                const hasColspan = allCells.some(cell => parseInt(cell.getAttribute('colspan') || '1') > 1);
+                const maxCols = Math.max(...rows.map(r => r.querySelectorAll('td').length));
+                const hasBlockContent = allCells.some(cell =>
+                    Array.from(cell.children).some(child => ['UL', 'OL', 'P', 'DIV'].includes(child.tagName))
+                );
+
+                // 版型表格判斷：有空白格 OR 有合併欄 OR 欄數 ≤ 2 且含區塊元素
+                const isLayoutTable = hasColspan || emptyCells > 0 || (maxCols <= 2 && hasBlockContent);
+
+                if (isLayoutTable) {
+                    const frag = doc.createDocumentFragment();
+                    rows.forEach(row => {
+                        const cells = Array.from(row.querySelectorAll('td'));
+                        const nonEmptyCells = cells.filter(cell => cell.textContent.trim() !== '');
+                        if (nonEmptyCells.length === 0) return; // 跳過空行
+
+                        const isColspanRow = cells.some(cell => parseInt(cell.getAttribute('colspan') || '1') > 1);
+
+                        if (nonEmptyCells.length === 1) {
+                            const cellText = nonEmptyCells[0].textContent.trim();
+                            if (isColspanRow && cellText.length <= 40) {
+                                // colspan 短標題列 → 直接升格為 h3（標題正規化已跑過）
+                                const h = doc.createElement('h3');
+                                while (nonEmptyCells[0].firstChild) h.appendChild(nonEmptyCells[0].firstChild);
+                                frag.appendChild(h);
+                            } else {
+                                // 單格有內容（圖片佔位旁） → 直接提升內容
+                                while (nonEmptyCells[0].firstChild) frag.appendChild(nonEmptyCells[0].firstChild);
+                            }
                         } else {
-                            // 多欄都有內容 → flex container
+                            // 多格有內容 → flex container
                             const flexContainer = doc.createElement('div');
                             flexContainer.className = 'flex-container';
                             nonEmptyCells.forEach(cell => {
@@ -467,13 +485,15 @@
                                 while (cell.firstChild) flexItem.appendChild(cell.firstChild);
                                 flexContainer.appendChild(flexItem);
                             });
-                            table.parentNode.replaceChild(flexContainer, table);
+                            frag.appendChild(flexContainer);
                         }
-                        return; // 跳過後續一般表格無障礙處理
-                    }
+                    });
+                    table.parentNode.insertBefore(frag, table);
+                    table.remove();
+                    return;
                 }
 
-                // 一般表格無障礙處理
+                // 資料表格 → 標準無障礙處理（caption + thead + th[scope]）
                 if (!table.querySelector('caption')) {
                     const caption = doc.createElement('caption');
                     caption.textContent = '資料表格';
