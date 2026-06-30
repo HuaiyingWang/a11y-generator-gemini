@@ -350,8 +350,9 @@
                 });
             }
 
-            // 4.5 智慧標題偵測：移除編輯者附注，並將符合特徵的 <p> 升格為 <h2>
-            // 後續步驟 5 會統一將最小層級調整為 h3 起始
+            // 4.5 智慧標題偵測：依語意層級升格 <p>，後續步驟 5 統一從 h3 起始正規化
+            // 層級策略：主區塊→h1、子區塊/清單標籤→h2、年度細分→h3
+            // 正規化後：h1→h3、h2→h4、h3→h5，形成正確三層標題層級
 
             // 移除純編輯者附注（如「(放在網站最上方)」）
             Array.from(body.querySelectorAll('p')).forEach(p => {
@@ -359,26 +360,40 @@
                 if (text.length < 50 && /^[（(]/.test(text) && /[）)]$/.test(text)) p.remove();
             });
 
-            // 偵測並升格標題型段落
+            // 依特徵模式分配語意標題層級
             Array.from(body.querySelectorAll('p')).forEach(p => {
                 const text = p.textContent.trim();
                 if (!text) return;
                 const firstCode = text.codePointAt(0);
-                const hasHeadingPattern = (
-                    /^【.{1,30}】/.test(text) ||                       // 【標題】格式
-                    /^[▲★◆■▶►▸]\s*/.test(text) ||                   // 特殊符號前綴
-                    /^\d{2,3}年$/.test(text) ||                        // 年度標籤（112年、113年）
-                    (firstCode >= 0x1F300 && firstCode <= 0x1FFFF) ||  // Emoji 前綴（📌📢📞）
-                    (firstCode >= 0x2600 && firstCode <= 0x27BF)       // 其他符號（⚠️✅）
+
+                // 主要區塊標題 → h1（正規化後為 h3）
+                const isMainSection = (
+                    /^【.{1,30}】/.test(text) ||
+                    (firstCode >= 0x1F300 && firstCode <= 0x1FFFF) ||  // Emoji（📌📢📞）
+                    (firstCode >= 0x2600 && firstCode <= 0x27BF)        // 符號（⚠️✅）
                 );
+
+                // 子區塊標題 → h2（正規化後為 h4）
+                const isSubSection = /^[▲★◆■▶►▸]\s*/.test(text);
+
+                // 年度/細分標籤 → h3（正規化後為 h5）
+                const isYearLabel = /^\d{2,3}年$/.test(text);
+
+                // 短句在清單前（≤20字、無冒號） → h2（同子區塊層級）
                 const isShortBeforeList = (
                     text.length <= 20 &&
-                    !text.includes('：') && !text.includes(':') &&     // 排除「項目：內容」格式
+                    !text.includes('：') && !text.includes(':') &&
                     p.nextElementSibling &&
                     ['UL', 'OL'].includes(p.nextElementSibling.tagName)
                 );
-                if (hasHeadingPattern || isShortBeforeList) {
-                    const h = doc.createElement('h2');
+
+                let level = null;
+                if (isMainSection)                    level = 1;
+                else if (isYearLabel)                 level = 3;
+                else if (isSubSection || isShortBeforeList) level = 2;
+
+                if (level !== null) {
+                    const h = doc.createElement(`h${level}`);
                     while (p.firstChild) h.appendChild(p.firstChild);
                     p.parentNode.replaceChild(h, p);
                 }
@@ -467,8 +482,8 @@
                         if (nonEmptyCells.length === 1) {
                             const cellText = nonEmptyCells[0].textContent.trim();
                             if (isColspanRow && cellText.length <= 40) {
-                                // colspan 短標題列 → 直接升格為 h3（標題正規化已跑過）
-                                const h = doc.createElement('h3');
+                                // colspan 短標題列 → h4（正規化已跑過，主區塊為 h3，此為子層）
+                                const h = doc.createElement('h4');
                                 while (nonEmptyCells[0].firstChild) h.appendChild(nonEmptyCells[0].firstChild);
                                 frag.appendChild(h);
                             } else {
