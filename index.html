@@ -812,11 +812,32 @@
                     const hasInput = !!input.trim();
                     const hasSource = !!sourceInput.trim();
 
-                    if (hasInput) combinedHtml += transformToCleanHTML(input) + '\n\n';
+                    // contextText 提前定義，Word 圖片 AI 分析需在 transformToCleanHTML 之前執行
+                    const contextText = (input + ' ' + sourceInput).replace(/<[^>]*>?/gm, '').substring(0, 800);
+
+                    // Word 內嵌圖片智慧 alt 生成：Gemini Vision 分析每張圖，結果注入 alt 再轉換
+                    let wordInput = input;
+                    const wordImgEntries = Object.entries(wordImageMap);
+                    if (wordImgEntries.length > 0) {
+                        for (const [key, dataUri] of wordImgEntries) {
+                            const m = dataUri.match(/^data:([^;]+);base64,(.+)$/);
+                            if (!m) continue;
+                            const aiResult = await analyzeImageWithGemini(m[2], m[1], contextText);
+                            const aiAlt = (aiResult?.alt || '').replace(/"/g, '&quot;');
+                            if (aiAlt) {
+                                // 替換該 img 的 alt（無論原本是空或 placeholder 提示文字）
+                                wordInput = wordInput.replace(
+                                    new RegExp(`(<img[^>]*src="${key}"[^>]*)alt="[^"]*"`, 'g'),
+                                    `$1alt="${aiAlt}"`
+                                );
+                            }
+                        }
+                    }
+
+                    if (hasInput) combinedHtml += transformToCleanHTML(wordInput) + '\n\n';
                     if (hasSource) combinedHtml += transformToCleanHTML(sourceInput) + '\n\n';
 
                     let imgCodesStr = '';
-                    const contextText = (input + ' ' + sourceInput).replace(/<[^>]*>?/gm, '').substring(0, 800);
 
                     if (images.length > 0) {
                         const imgCodes = [];
@@ -862,7 +883,7 @@
                         `✔️ [A11y 標題與連結防護] 標題層級由 h3 起始排列；為所有 <a> 補上 target="_blank" 與 (另開新視窗) 語意。`
                     ];
 
-                    if (images.length > 0) logs.unshift(`✨ [AI 視覺感知] 圖片分析已依據內文語意生成精準 Alt，不含廢話填充！`);
+                    if (images.length > 0 || wordImgEntries.length > 0) logs.unshift(`✨ [AI 視覺感知] 圖片分析已依據內文語意生成精準 Alt，不含廢話填充！`);
 
                     setReport(logs);
                     setActiveTab('output');
