@@ -201,17 +201,17 @@
 }`);
 
             if (has(/<ul[\s>]/i)) rules.push(
-`.a11y-container ul {
+`.a11y-container ul:not(.member-list) {
     margin: 0 0 1.25rem 0;
     padding-left: 0;
     list-style: none;
 }
-.a11y-container ul li {
+.a11y-container ul:not(.member-list) li {
     position: relative;
     padding-left: 1.5rem;
     margin-bottom: 0.625rem;
 }
-.a11y-container ul li::before {
+.a11y-container ul:not(.member-list) li::before {
     content: '';
     position: absolute;
     left: 0;
@@ -235,6 +235,35 @@
 .a11y-container ol li::marker {
     color: #801a00;
     font-weight: 700;
+}`);
+
+            if (has(/class="[^"]*member-list/i)) rules.push(
+`.a11y-container .member-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 0 0 1.75rem 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+}
+.a11y-container .member-list li {
+    padding: 10px 14px;
+    border-radius: 6px;
+    border: 1px solid #e8ddd8;
+    background-color: #fdfaf9;
+}
+.a11y-container .member-name {
+    display: block;
+    font-weight: 700;
+    color: #1a1a1a;
+    font-size: 0.9375rem;
+}
+.a11y-container .member-org {
+    display: block;
+    font-size: 0.8125rem;
+    color: #595959;
+    margin-top: 3px;
+    line-height: 1.4;
 }`);
 
             if (has(/<table[\s>]/i)) rules.push(
@@ -341,7 +370,42 @@
                 });
             }
 
-            // 6. 表格轉換為 Flex 佈局 (智慧辨識舊版排版表格)
+            // 6. 成對段落語意偵測：連續短段落（姓名＋單位、項目＋說明）自動轉為語意清單
+            Array.from(body.querySelectorAll('h3, h4, h5, h6')).forEach(headingEl => {
+                if (headingEl.parentNode !== body) return;
+                const paras = [];
+                let next = headingEl.nextElementSibling;
+                while (
+                    next && next.tagName === 'P' && next.parentNode === body &&
+                    next.children.length === 0 &&
+                    next.textContent.trim().length > 0 &&
+                    next.textContent.trim().length < 90
+                ) {
+                    paras.push(next);
+                    next = next.nextElementSibling;
+                }
+                // 4 個以上且為偶數 → 視為成對清單（名稱 + 說明）
+                if (paras.length >= 4 && paras.length % 2 === 0) {
+                    const ul = doc.createElement('ul');
+                    ul.className = 'member-list';
+                    for (let k = 0; k < paras.length; k += 2) {
+                        const li = doc.createElement('li');
+                        const nameEl = doc.createElement('strong');
+                        nameEl.className = 'member-name';
+                        nameEl.textContent = paras[k].textContent.trim();
+                        const orgEl = doc.createElement('span');
+                        orgEl.className = 'member-org';
+                        orgEl.textContent = paras[k + 1].textContent.trim();
+                        li.appendChild(nameEl);
+                        li.appendChild(orgEl);
+                        ul.appendChild(li);
+                    }
+                    headingEl.insertAdjacentElement('afterend', ul);
+                    paras.forEach(p => p.remove());
+                }
+            });
+
+            // 7. 表格轉換為 Flex 佈局 (智慧辨識舊版排版表格)
             Array.from(body.querySelectorAll('table')).forEach(table => {
                 const rows = table.querySelectorAll('tr');
                 if (rows.length === 1) {
