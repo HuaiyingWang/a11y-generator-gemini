@@ -566,8 +566,14 @@
             });
 
             // 7. 圖片圖說智慧綁定 (加入 .text-center 與 .text-muted)
+            let autoImgIdx = 0;
             Array.from(body.querySelectorAll('img')).forEach(img => {
-                if (!img.hasAttribute('alt')) img.setAttribute('alt', '');
+                autoImgIdx++;
+                // alt 空或缺少時補上提示文字，方便使用者辨識並手動填寫
+                const currentAlt = img.getAttribute('alt') || '';
+                if (!currentAlt.trim()) {
+                    img.setAttribute('alt', `[圖片 ${autoImgIdx}：請填寫替代文字]`);
+                }
 
                 // 尋找緊接在後的說明段落
                 let next = img.nextElementSibling;
@@ -781,7 +787,7 @@
                             return image.read("base64").then(function(b64) {
                                 const key = `__wimg${++imgIdx}__`;
                                 imageMap[key] = `data:${image.contentType};base64,${b64}`;
-                                return { src: key, alt: '' };
+                                return { src: key, alt: `[圖片 ${imgIdx}：請填寫替代文字]` };
                             });
                         })
                     };
