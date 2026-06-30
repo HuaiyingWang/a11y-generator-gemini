@@ -142,6 +142,17 @@
 `.a11y-container p {
     margin-top: 0;
     margin-bottom: 1.25rem;
+}
+/* 智慧容器修正：移除特定容器內 p 的多餘間距 */
+.a11y-container td p,
+.a11y-container th p {
+    margin: 0;
+}
+.a11y-container li > p:last-child,
+.a11y-container .flex-item > p:last-child,
+.a11y-container .content-box > p:last-child,
+.a11y-container .member-list li > p:last-child {
+    margin-bottom: 0;
 }`);
 
             if (has(/<strong[\s>]/i)) rules.push(
