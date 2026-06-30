@@ -705,13 +705,18 @@ ${contextText ? '圖片所在文章的部分內容：' + contextText : ''}
                 if (!response.ok) {
                     const errBody = await response.text();
                     console.error('[Gemini API] HTTP', response.status, errBody);
-                    return { alt: "[AI分析失敗，請手動填寫]", caption: "圖片分析服務暫時無法使用，請手動補充說明。" };
+                    // 暫時把 HTTP 狀態碼顯示在 alt 以便診斷，修好後再移除
+                    return { alt: `[API錯誤 HTTP${response.status}]`, caption: errBody.substring(0, 200) };
                 }
                 const data = await response.json();
+                if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    console.error('[Gemini API] 回應格式異常：', JSON.stringify(data).substring(0, 300));
+                    return { alt: `[回應格式異常: ${JSON.stringify(data).substring(0, 80)}]`, caption: "請手動補充說明。" };
+                }
                 return JSON.parse(data.candidates[0].content.parts[0].text);
             } catch (error) {
                 console.error('[Gemini API] 呼叫失敗：', error);
-                return { alt: "[AI分析失敗，請手動填寫]", caption: "圖片分析服務暫時無法使用，請手動補充說明。" };
+                return { alt: `[呼叫失敗: ${error.message}]`, caption: "請手動補充說明。" };
             }
         };
 
