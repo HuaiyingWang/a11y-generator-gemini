@@ -411,16 +411,30 @@
                 if (rows.length === 1) {
                     const cells = rows[0].querySelectorAll('td');
                     if (cells.length > 1) {
-                        // 若為單列多欄的表格，極高機率是舊時代用來做並排的排版，轉換為 flex
-                        const flexContainer = doc.createElement('div');
-                        flexContainer.className = 'flex-container';
-                        cells.forEach(cell => {
-                            const flexItem = doc.createElement('div');
-                            flexItem.className = 'flex-item';
-                            while (cell.firstChild) flexItem.appendChild(cell.firstChild);
-                            flexContainer.appendChild(flexItem);
-                        });
-                        table.parentNode.replaceChild(flexContainer, table);
+                        // 過濾空白儲存格（含僅有空白 p 的圖片佔位欄），避免產生空白區塊
+                        const nonEmptyCells = Array.from(cells).filter(cell => cell.textContent.trim() !== '');
+
+                        if (nonEmptyCells.length === 0) {
+                            // 全空 → 直接移除
+                            table.remove();
+                        } else if (nonEmptyCells.length === 1) {
+                            // 只有一欄有內容（另一欄為圖片佔位）→ 直接提升內容，不加 flex 包裝
+                            const frag = doc.createDocumentFragment();
+                            while (nonEmptyCells[0].firstChild) frag.appendChild(nonEmptyCells[0].firstChild);
+                            table.parentNode.insertBefore(frag, table);
+                            table.remove();
+                        } else {
+                            // 多欄都有內容 → flex container
+                            const flexContainer = doc.createElement('div');
+                            flexContainer.className = 'flex-container';
+                            nonEmptyCells.forEach(cell => {
+                                const flexItem = doc.createElement('div');
+                                flexItem.className = 'flex-item';
+                                while (cell.firstChild) flexItem.appendChild(cell.firstChild);
+                                flexContainer.appendChild(flexItem);
+                            });
+                            table.parentNode.replaceChild(flexContainer, table);
+                        }
                         return; // 跳過後續一般表格無障礙處理
                     }
                 }
