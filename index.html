@@ -950,7 +950,7 @@ ${contextText ? '圖片所在文章的部分內容：' + contextText : ''}
 
                     if (images.length > 0 || wordImgEntries.length > 0) {
                         if (quotaHit) {
-                            logs.unshift(`⚠️ [AI 配額已用完] Gemini 免費配額今日已耗盡，圖片 alt 需手動填寫。請明天再試，或至 Google AI Studio 查看配額使用量。`);
+                            logs.unshift(`⚠️ [AI 配額已用完] 今日圖片智慧分析次數已達上限，圖片 alt 需手動填寫。請明天再試。`);
                         } else {
                             logs.unshift(`✨ [AI 視覺感知] 圖片分析已依據內文語意生成精準 Alt，不含廢話填充！`);
                         }
