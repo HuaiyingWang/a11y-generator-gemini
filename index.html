@@ -748,7 +748,7 @@ ${contextText ? '圖片所在文章的部分內容：' + contextText : ''}
                         return analyzeImageWithGemini(base64Data, mimeType, contextText, retries - 1);
                     }
                     if (response.status === 429) {
-                        return { alt: '[AI 分析失敗，請手動填寫]', caption: 'Gemini 免費配額今日已用完，請明天再試，或手動補充 alt 文字。' };
+                        return { alt: '[AI 分析失敗，請手動填寫]', caption: 'Gemini 免費配額今日已用完，請明天再試，或手動補充 alt 文字。', _quota: true };
                     }
                     return { alt: '[AI 分析失敗，請手動填寫]', caption: `HTTP ${response.status}：${errBody.substring(0, 150)}` };
                 }
@@ -876,6 +876,7 @@ ${contextText ? '圖片所在文章的部分內容：' + contextText : ''}
                     // Word 內嵌圖片智慧 alt 生成：Gemini Vision 分析每張圖，結果注入 alt 再轉換
                     let wordInput = input;
                     const wordImgEntries = Object.entries(wordImageMap);
+                    let quotaHit = false;
                     if (wordImgEntries.length > 0) {
                         for (let wi = 0; wi < wordImgEntries.length; wi++) {
                             const [key, dataUri] = wordImgEntries[wi];
@@ -884,6 +885,7 @@ ${contextText ? '圖片所在文章的部分內容：' + contextText : ''}
                             if (wi > 0) await sleep(1500); // 多張圖之間間隔 1.5 秒，避免 RPM 限制
                             const { b64, mimeType: mt } = await resizeImageForAI(m[2], m[1]);
                             const aiResult = await analyzeImageWithGemini(b64, mt, contextText);
+                            if (aiResult?._quota) quotaHit = true;
                             const aiAlt = (aiResult?.alt || '').replace(/"/g, '&quot;');
                             if (aiAlt) {
                                 wordInput = wordInput.replace(
@@ -906,6 +908,7 @@ ${contextText ? '圖片所在文章的部分內容：' + contextText : ''}
                             if (i > 0) await sleep(1500); // 多張圖之間間隔 1.5 秒，避免 RPM 限制
                             const { b64: rB64, mimeType: rMt } = await resizeImageForAI(imgData.base64, imgData.mimeType);
                             const aiResult = await analyzeImageWithGemini(rB64, rMt, contextText);
+                            if (aiResult?._quota) quotaHit = true;
                             const altText = aiResult?.alt || `[需人工確認圖片意涵] ${imgData.file.name}`;
                             imgCodes.push(
                                 `<div class="text-center">\n` +
@@ -945,7 +948,13 @@ ${contextText ? '圖片所在文章的部分內容：' + contextText : ''}
                         `✔️ [A11y 標題與連結防護] 標題層級由 h3 起始排列；為所有 <a> 補上 target="_blank" 與 (另開新視窗) 語意。`
                     ];
 
-                    if (images.length > 0 || wordImgEntries.length > 0) logs.unshift(`✨ [AI 視覺感知] 圖片分析已依據內文語意生成精準 Alt，不含廢話填充！`);
+                    if (images.length > 0 || wordImgEntries.length > 0) {
+                        if (quotaHit) {
+                            logs.unshift(`⚠️ [AI 配額已用完] Gemini 免費配額今日已耗盡，圖片 alt 需手動填寫。請明天再試，或至 Google AI Studio 查看配額使用量。`);
+                        } else {
+                            logs.unshift(`✨ [AI 視覺感知] 圖片分析已依據內文語意生成精準 Alt，不含廢話填充！`);
+                        }
+                    }
 
                     setReport(logs);
                     setActiveTab('output');
