@@ -681,8 +681,26 @@
             img.src = `data:${mimeType};base64,${base64Data}`;
         });
 
+        // --- 圖片指紋（取首尾各 80 字元 + 長度），避免對整個 base64 跑 hash ---
+        const imageFingerprint = (b64) => {
+            const s = b64.substring(0, 80) + b64.slice(-80) + b64.length;
+            let h = 0;
+            for (let i = 0; i < s.length; i++) { h = Math.imul(31, h) + s.charCodeAt(i) | 0; }
+            return 'gemini_' + Math.abs(h).toString(36);
+        };
+
         // --- 強化的 AI 語意識別引擎 ---
         const analyzeImageWithGemini = async (base64Data, mimeType, contextText = "", retries = 1) => {
+            // 先查 localStorage 快取（同一張圖不重複呼叫 API）
+            const cacheKey = imageFingerprint(base64Data);
+            try {
+                const cached = localStorage.getItem(cacheKey);
+                if (cached) {
+                    console.log('[Gemini API] 快取命中:', cacheKey);
+                    return JSON.parse(cached);
+                }
+            } catch (_) {}
+
             // 透過 Cloudflare Worker proxy 呼叫，API Key 藏在 Worker 環境變數，不出現在前端
             const url = 'https://a11y-gemini-proxy.love520297.workers.dev/';
             const payload = {
@@ -729,17 +747,23 @@ ${contextText ? '圖片所在文章的部分內容：' + contextText : ''}
                         await sleep(5000);
                         return analyzeImageWithGemini(base64Data, mimeType, contextText, retries - 1);
                     }
-                    return { alt: `[API錯誤 HTTP${response.status}]`, caption: errBody.substring(0, 200) };
+                    if (response.status === 429) {
+                        return { alt: '[AI 分析失敗，請手動填寫]', caption: 'Gemini 免費配額今日已用完，請明天再試，或手動補充 alt 文字。' };
+                    }
+                    return { alt: '[AI 分析失敗，請手動填寫]', caption: `HTTP ${response.status}：${errBody.substring(0, 150)}` };
                 }
                 const data = await response.json();
                 if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
                     console.error('[Gemini API] 回應格式異常：', JSON.stringify(data).substring(0, 300));
-                    return { alt: `[回應格式異常: ${JSON.stringify(data).substring(0, 80)}]`, caption: "請手動補充說明。" };
+                    return { alt: '[AI 分析失敗，請手動填寫]', caption: '回應格式異常，請手動補充說明。' };
                 }
-                return JSON.parse(data.candidates[0].content.parts[0].text);
+                const result = JSON.parse(data.candidates[0].content.parts[0].text);
+                // 成功後寫入快取
+                try { localStorage.setItem(cacheKey, JSON.stringify(result)); } catch (_) {}
+                return result;
             } catch (error) {
                 console.error('[Gemini API] 呼叫失敗：', error);
-                return { alt: `[呼叫失敗: ${error.message}]`, caption: "請手動補充說明。" };
+                return { alt: '[AI 分析失敗，請手動填寫]', caption: '請手動補充說明。' };
             }
         };
 
