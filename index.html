@@ -663,6 +663,8 @@
             return `<article class="a11y-container">\n${outputStr.trim()}\n</article>`;
         };
 
+        const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+
         // 送給 AI 前先縮圖至 max 800px，大幅降低 Token 消耗、避免 429
         const resizeImageForAI = (base64Data, mimeType, maxDim = 800) => new Promise((resolve) => {
             const img = new Image();
@@ -680,7 +682,7 @@
         });
 
         // --- 強化的 AI 語意識別引擎 ---
-        const analyzeImageWithGemini = async (base64Data, mimeType, contextText = "") => {
+        const analyzeImageWithGemini = async (base64Data, mimeType, contextText = "", retries = 1) => {
             // 透過 Cloudflare Worker proxy 呼叫，API Key 藏在 Worker 環境變數，不出現在前端
             const url = 'https://a11y-gemini-proxy.love520297.workers.dev/';
             const payload = {
@@ -721,7 +723,12 @@ ${contextText ? '圖片所在文章的部分內容：' + contextText : ''}
                 if (!response.ok) {
                     const errBody = await response.text();
                     console.error('[Gemini API] HTTP', response.status, errBody);
-                    // 暫時把 HTTP 狀態碼顯示在 alt 以便診斷，修好後再移除
+                    // 429：等待 5 秒後自動重試一次（處理 RPM 限制）
+                    if (response.status === 429 && retries > 0) {
+                        console.warn('[Gemini API] 429 配額限制，5 秒後重試...');
+                        await sleep(5000);
+                        return analyzeImageWithGemini(base64Data, mimeType, contextText, retries - 1);
+                    }
                     return { alt: `[API錯誤 HTTP${response.status}]`, caption: errBody.substring(0, 200) };
                 }
                 const data = await response.json();
@@ -846,14 +853,15 @@ ${contextText ? '圖片所在文章的部分內容：' + contextText : ''}
                     let wordInput = input;
                     const wordImgEntries = Object.entries(wordImageMap);
                     if (wordImgEntries.length > 0) {
-                        for (const [key, dataUri] of wordImgEntries) {
+                        for (let wi = 0; wi < wordImgEntries.length; wi++) {
+                            const [key, dataUri] = wordImgEntries[wi];
                             const m = dataUri.match(/^data:([^;]+);base64,(.+)$/);
                             if (!m) continue;
+                            if (wi > 0) await sleep(1500); // 多張圖之間間隔 1.5 秒，避免 RPM 限制
                             const { b64, mimeType: mt } = await resizeImageForAI(m[2], m[1]);
                             const aiResult = await analyzeImageWithGemini(b64, mt, contextText);
                             const aiAlt = (aiResult?.alt || '').replace(/"/g, '&quot;');
                             if (aiAlt) {
-                                // 替換該 img 的 alt（無論原本是空或 placeholder 提示文字）
                                 wordInput = wordInput.replace(
                                     new RegExp(`(<img[^>]*src="${key}"[^>]*)alt="[^"]*"`, 'g'),
                                     `$1alt="${aiAlt}"`
@@ -871,6 +879,7 @@ ${contextText ? '圖片所在文章的部分內容：' + contextText : ''}
                         const imgCodes = [];
                         for (let i = 0; i < images.length; i++) {
                             const imgData = images[i];
+                            if (i > 0) await sleep(1500); // 多張圖之間間隔 1.5 秒，避免 RPM 限制
                             const { b64: rB64, mimeType: rMt } = await resizeImageForAI(imgData.base64, imgData.mimeType);
                             const aiResult = await analyzeImageWithGemini(rB64, rMt, contextText);
                             const altText = aiResult?.alt || `[需人工確認圖片意涵] ${imgData.file.name}`;
